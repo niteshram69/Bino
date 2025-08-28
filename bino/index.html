@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bino Bot Discovery Quest</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        @keyframes float {
+            0% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-15px) rotate(5deg); }
+            100% { transform: translateY(0px) rotate(0deg); }
+        }
+        
+        @keyframes blob {
+            0% { transform: translate(0px, 0px) scale(1); }
+            33% { transform: translate(30px, -50px) scale(1.1); }
+            66% { transform: translate(-20px, 20px) scale(0.9); }
+            100% { transform: translate(0px, 0px) scale(1); }
+        }
+        
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 1; }
+            100% { transform: scale(1.4); opacity: 0; }
+        }
+        
+        @keyframes coin-collect {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-50px) scale(1.5); opacity: 0; }
+        }
+        
+        @keyframes confetti-fall {
+            0% { transform: translateY(-100px) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+        
+        @keyframes sparkle {
+            0% { transform: scale(0) rotate(0deg); opacity: 1; }
+            100% { transform: scale(1.5) rotate(180deg); opacity: 0; }
+        }
+        
+        @keyframes level-up {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+        
+        .animate-float {
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        .animate-blob {
+            animation: blob 7s infinite;
+        }
+        
+        .animation-delay-2000 {
+            animation-delay: 2s;
+        }
+        
+        .animation-delay-4000 {
+            animation-delay: 4s;
+        }
+        
+        .btn-primary {
+            @apply bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-3 px-6 rounded-full shadow-lg hover:shadow-xl transition-all transform hover:scale-105 active:scale-95;
+        }
+        
+        .coin {
+            @apply inline-block bg-gradient-to-r from-yellow-400 to-yellow-500 text-yellow-900 font-bold py-1 px-3 rounded-full text-sm shadow-md;
+        }
+        
+        .pulse-ring {
+            animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
+        
+        .coin-collect {
+            animation: coin-collect 0.8s ease-out forwards;
+        }
+        
+        .confetti {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            background: #f0f;
+            animation: confetti-fall 3s linear forwards;
+            z-index: 1000;
+        }
+        
+        .interactive-card {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .interactive-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .glow {
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.5);
+        }
+        
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            opacity: 0;
+            animation: particle-float 2s ease-out forwards;
+        }
+        
+        @keyframes particle-float {
+            0% { transform: translate(0, 0) scale(1); opacity: 1; }
+            100% { transform: translate(var(--x), var(--y)) scale(0); opacity: 0; }
+        }
+        
+        .sparkle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: radial-gradient(circle, #fff 0%, transparent 70%);
+            border-radius: 50%;
+            animation: sparkle 0.6s ease-out forwards;
+        }
+        
+        .level-up {
+            animation: level-up 0.5s ease-out;
+        }
+        
+        .dragging {
+            opacity: 0.5;
+            transform: scale(1.05);
+        }
+        
+        .drag-over {
+            background-color: #e0e7ff !important;
+            border-color: #6366f1 !important;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        
+        // Sound effects using Web Audio API
+        const useSound = () => {
+            const audioContextRef = useRef(null);
+            
+            const initAudio = () => {
+                if (!audioContextRef.current) {
+                    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            };
+            
+            const playSound = (frequency, duration, type = 'sine') => {
+                initAudio();
+                const oscillator = audioContextRef.current.createOscillator();
+                const gainNode = audioContextRef.current.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContextRef.current.destination);
+                
+                oscillator.type = type;
+                oscillator.frequency.value = frequency;
+                gainNode.gain.value = 0.2;
+                
+                oscillator.start();
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioContextRef.current.currentTime + duration);
+                oscillator.stop(audioContextRef.current.currentTime + duration);
+            };
+            
+            const playClickSound = () => playSound(523.25, 0.1); // C5
+            const playSuccessSound = () => {
+                playSound(523.25, 0.1); // C5
+                setTimeout(() => playSound(659.25, 0.1), 100); // E5
+                setTimeout(() => playSound(783.99, 0.2), 200); // G5
+            };
+            const playCoinSound = () => playSound(1046.50, 0.15); // C6
+            const playLevelUpSound = () => {
+                playSound(523.25, 0.1); // C5
+                setTimeout(() => playSound(659.25, 0.1), 100); // E5
+                setTimeout(() => playSound(783.99, 0.1), 200); // G5
+                setTimeout(() => playSound(1046.50, 0.2), 300); // C6
+            };
+            const playErrorSound = () => playSound(200, 0.2, 'sawtooth'); // Low error sound
+            
+            return { playClickSound, playSuccessSound, playCoinSound, playLevelUpSound, playErrorSound };
+        };
+        
+        // Confetti effect
+        const Confetti = ({ trigger }) => {
+            const containerRef = useRef(null);
+            
+            useEffect(() => {
+                if (!trigger || !containerRef.current) return;
+                
+                const container = containerRef.current;
+                const colors = ['#f87171', '#60a5fa', '#34d399', '#fbbf24', '#a78bfa'];
+                
+                for (let i = 0; i < 100; i++) {
+                    setTimeout(() => {
+                        const confetti = document.createElement('div');
+                        confetti.className = 'confetti';
+                        confetti.style.left = `${Math.random() * 100}%`;
+                        confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                        confetti.style.width = `${Math.random() * 10 + 5}px`;
+                        confetti.style.height = confetti.style.width;
+                        confetti.style.opacity = Math.random() * 0.8 + 0.2;
+                        container.appendChild(confetti);
+                        
+                        setTimeout(() => confetti.remove(), 3000);
+                    }, i * 30);
+                }
+            }, [trigger]);
+            
+            return <div ref={containerRef} />;
+        };
+        
+        // Particle effect
+        const createParticles = (e, color, count = 15) => {
+            const container = document.body;
+            const rect = e.target.getBoundingClientRect();
+            const x = rect.left + rect.width / 2;
+            const y = rect.top + rect.height / 2;
+            
+            for (let i = 0; i < count; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = `${x}px`;
+                particle.style.top = `${y}px`;
+                particle.style.width = '8px';
+                particle.style.height = '8px';
+                particle.style.backgroundColor = color;
+                
+                const angle = Math.random() * Math.PI * 2;
+                const distance = Math.random() * 50 + 20;
+                particle.style.setProperty('--x', `${Math.cos(angle) * distance}px`);
+                particle.style.setProperty('--y', `${Math.sin(angle) * distance}px`);
+                
+                container.appendChild(particle);
+                setTimeout(() => particle.remove(), 2000);
+            }
+        };
+        
+        // Sparkle effect
+        const createSparkles = (e, count = 5) => {
+            const container = e.target.parentNode;
+            const rect = e.target.getBoundingClientRect();
+            const x = rect.left + rect.width / 2;
+            const y = rect.top + rect.height / 2;
+            
+            for (let i = 0; i < count; i++) {
+                const sparkle = document.createElement('div');
+                sparkle.className = 'sparkle';
+                sparkle.style.left = `${x + (Math.random() - 0.5) * 40}px`;
+                sparkle.style.top = `${y + (Math.random() - 0.5) * 40}px`;
+                container.appendChild(sparkle);
+                
+                setTimeout(() => sparkle.remove(), 600);
+            }
+        };
+        
+        // App Component
+        function App() {
+            const [currentStep, setCurrentStep] = useState('landing');
+            const [coins, setCoins] = useState(0);
+            const [completedChallenges, setCompletedChallenges] = useState([]);
+            const [level, setLevel] = useState(1);
+            const [showTutorial, setShowTutorial] = useState(true);
+            const [confettiTrigger, setConfettiTrigger] = useState(false);
+            const [floatingCoins, setFloatingCoins] = useState([]);
+            const [streak, setStreak] = useState(0);
+            const [achievements, setAchievements] = useState([]);
+            const { playClickSound, playSuccessSound, playCoinSound, playLevelUpSound, playErrorSound } = useSound();
+            
+            // Initialize floating coins
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    if (floatingCoins.length < 3) {
+                        const newCoin = {
+                            id: Date.now(),
+                            top: Math.random() * 60 + 20,
+                            left: Math.random() * 80 + 10,
+                            collected: false
+                        };
+                        setFloatingCoins(prev => [...prev, newCoin]);
+                        
+                        // Remove coin after 10 seconds if not collected
+                        setTimeout(() => {
+                            setFloatingCoins(prev => prev.filter(coin => coin.id !== newCoin.id));
+                        }, 10000);
+                    }
+                }, 5000);
+                
+                return () => clearInterval(interval);
+            }, [floatingCoins.length]);
+            
+            const startQuest = () => {
+                playClickSound();
+                setCurrentStep('challenge');
+            };
+            
+            const completeChallenge = (challengeId, earnedCoins) => {
+                playSuccessSound();
+                setCoins(prev => {
+                    const newCoins = prev + earnedCoins;
+                    // Level up every 30 coins
+                    if (newCoins >= level * 30) {
+                        setLevel(prevLevel => {
+                            playLevelUpSound();
+                            return prevLevel + 1;
+                        });
+                    }
+                    return newCoins;
+                });
+                setCompletedChallenges(prev => [...prev, challengeId]);
+                setStreak(prev => prev + 1);
+                
+                // Check for achievements
+                if (streak === 2) {
+                    setAchievements(prev => [...prev, { id: 'streak3', name: 'On Fire!', icon: '🔥' }]);
+                }
+                if (completedChallenges.length === 4) {
+                    setAchievements(prev => [...prev, { id: 'allChallenges', name: 'Quest Master', icon: '👑' }]);
+                }
+                
+                setConfettiTrigger(prev => !prev);
+                setCurrentStep('reward');
+            };
+            
+            const restartQuest = () => {
+                playClickSound();
+                setCurrentStep('landing');
+            };
+            
+            const collectCoin = (e, coinId) => {
+                playCoinSound();
+                createParticles(e, '#fbbf24');
+                createSparkles(e);
+                
+                setFloatingCoins(prev => prev.filter(coin => coin.id !== coinId));
+                setCoins(prev => prev + 1);
+            };
+            
+            const closeTutorial = () => {
+                playClickSound();
+                setShowTutorial(false);
+                localStorage.setItem('binoBotTutorialSeen', 'true');
+            };
+            
+            // Check if tutorial was seen before
+            useEffect(() => {
+                const seen = localStorage.getItem('binoBotTutorialSeen');
+                if (seen) {
+                    setShowTutorial(false);
+                }
+            }, []);
+            
+            return (
+                <div className="min-h-screen relative overflow-hidden">
+                    <Confetti trigger={confettiTrigger} />
+                    
+                    {/* Floating coins */}
+                    {floatingCoins.map(coin => (
+                        <div 
+                            key={coin.id}
+                            className="absolute cursor-pointer z-20"
+                            style={{
+                                top: `${coin.top}%`,
+                                left: `${coin.left}%`,
+                                animation: `float ${3 + Math.random() * 2}s ease-in-out infinite`
+                            }}
+                            onClick={(e) => collectCoin(e, coin.id)}
+                        >
+                            <div className="coin text-lg animate-pulse">+1</div>
+                        </div>
+                    ))}
+                    
+                    {/* Tutorial Modal */}
+                    {showTutorial && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 transform transition-all">
+                                <h2 className="text-2xl font-bold text-indigo-800 mb-4">Welcome to Bino Bot Quest!</h2>
+                                <div className="space-y-4 mb-6">
+                                    <div className="flex items-start">
+                                        <div className="bg-indigo-100 text-indigo-800 rounded-full w-8 h-8 flex items-center justify-center mr-3 flex-shrink-0">1</div>
+                                        <p>Complete challenges to discover Bino Bot's features</p>
+                                    </div>
+                                    <div className="flex items-start">
+                                        <div className="bg-indigo-100 text-indigo-800 rounded-full w-8 h-8 flex items-center justify-center mr-3 flex-shrink-0">2</div>
+                                        <p>Collect coins to unlock rewards and level up</p>
+                                    </div>
+                                    <div className="flex items-start">
+                                        <div className="bg-indigo-100 text-indigo-800 rounded-full w-8 h-8 flex items-center justify-center mr-3 flex-shrink-0">3</div>
+                                        <p>Share your achievements with friends</p>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={closeTutorial}
+                                    className="btn-primary w-full"
+                                >
+                                    Start Exploring!
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* Header */}
+                    <header className="bg-white bg-opacity-80 backdrop-blur-sm py-4 px-6 shadow-sm sticky top-0 z-10">
+                        <div className="max-w-6xl mx-auto flex justify-between items-center">
+                            <div className="flex items-center">
+                                <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white font-bold mr-3">BB</div>
+                                <h1 className="text-xl font-bold text-indigo-800">Bino Bot Discovery Quest</h1>
+                            </div>
+                            <div className="flex items-center space-x-4">
+                                <div className="flex items-center bg-indigo-100 px-3 py-1 rounded-full">
+                                    <span className="text-indigo-800 font-medium mr-2">Level:</span>
+                                    <span className="bg-indigo-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">{level}</span>
+                                </div>
+                                <div className="flex items-center bg-yellow-100 px-3 py-1 rounded-full">
+                                    <span className="coin">{coins}</span>
+                                </div>
+                                {streak > 0 && (
+                                    <div className="flex items-center bg-orange-100 px-3 py-1 rounded-full">
+                                        <span className="text-orange-800 font-medium mr-1">🔥</span>
+                                        <span className="text-orange-800 font-bold">{streak}</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </header>
+                    
+                    {/* Main Content */}
+                    <main>
+                        {currentStep === 'landing' && <LandingPage onStart={startQuest} />}
+                        {currentStep === 'challenge' && <ChallengeMeetingScheduler onComplete={completeChallenge} />}
+                        {currentStep === 'reward' && (
+                            <RewardSystem 
+                                coins={coins} 
+                                completedChallenges={completedChallenges}
+                                onRestart={restartQuest} 
+                                level={level}
+                                achievements={achievements}
+                            />
+                        )}
+                    </main>
+                </div>
+            );
+        }
+
+        // Landing Page Component
+        function LandingPage({ onStart }) {
+            const [explorerCount, setExplorerCount] = useState(0);
+            const [hovering, setHovering] = useState(false);
+            const [mascotExpression, setMascotExpression] = useState('happy');
+            
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    setExplorerCount(prev => {
+                        if (prev >= 1234) {
+                            clearInterval(interval);
+                            return 1234;
+                        }
+                        return prev + Math.floor(Math.random() * 20) + 1;
+                    });
+                }, 50);
+                
+                return () => clearInterval(interval);
+            }, []);
+
+            return (
+                <div className="flex flex-col items-center justify-center min-h-screen p-4 relative overflow-hidden">
+                    {/* Background decoration */}
+                    <div className="absolute inset-0 z-0">
+                        <div className="absolute top-20 left-10 w-72 h-72 bg-purple-200 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob"></div>
+                        <div className="absolute top-40 right-10 w-72 h-72 bg-yellow-200 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-2000"></div>
+                        <div className="absolute bottom-20 left-1/2 w-72 h-72 bg-pink-200 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-blob animation-delay-4000"></div>
+                    </div>
+
+                    <div className="z-10 max-w-4xl w-full text-center">
+                        {/* Animated Mascot */}
+                        <div className="mb-8 relative">
+                            <div 
+                                className="animate-float inline-block relative cursor-pointer"
+                                onMouseEnter={() => {
+                                    setHovering(true);
+                                    setMascotExpression('excited');
+                                }}
+                                onMouseLeave={() => {
+                                    setHovering(false);
+                                    setMascotExpression('happy');
+                                }}
+                                onClick={() => setMascotExpression(mascotExpression === 'happy' ? 'wink' : 'happy')}
+                            >
+                                <div className="w-40 h-40 mx-auto bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center drop-shadow-lg relative overflow-hidden">
+                                    <div className="text-white text-4xl font-bold">BB</div>
+                                    
+                                    {/* Mascot expressions */}
+                                    {mascotExpression === 'wink' && (
+                                        <div className="absolute top-12 right-8 w-4 h-4 bg-white rounded-full"></div>
+                                    )}
+                                    
+                                    {hovering && (
+                                        <>
+                                            <div className="absolute top-0 left-0 w-full h-full rounded-full border-4 border-yellow-400 pulse-ring"></div>
+                                            <div className="absolute top-0 left-0 w-full h-full rounded-full border-4 border-yellow-400 pulse-ring" style={{ animationDelay: '0.5s' }}></div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Main Heading */}
+                        <div>
+                            <h1 className="text-4xl md:text-6xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 mb-4">
+                                Bino Bot Discovery Quest
+                            </h1>
+                            <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto mb-2">
+                                Complete fun challenges to discover how Bino Bot can boost your productivity!
+                            </p>
+                            <p className="text-md text-indigo-500 font-medium mb-8">
+                                The gamified way to explore AI-powered productivity tools
+                            </p>
+                        </div>
+                        
+                        {/* CTA Button */}
+                        <div className="mb-12">
+                            <button
+                                onClick={onStart}
+                                onMouseEnter={() => setHovering(true)}
+                                onMouseLeave={() => setHovering(false)}
+                                className="btn-primary bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-4 px-8 rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center mx-auto text-lg relative overflow-hidden"
+                            >
+                                <span className="relative z-10 flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                                    </svg>
+                                    Start Your Quest
+                                </span>
+                                {hovering && (
+                                    <span className="absolute inset-0 bg-gradient-to-r from-purple-600 to-indigo-600 opacity-70"></span>
+                                )}
+                            </button>
+                        </div>
+                        
+                        {/* Features */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl mx-auto mb-12">
+                            <div className="interactive-card bg-white p-6 rounded-xl shadow-md border border-indigo-100">
+                                <div className="text-indigo-600 text-3xl mb-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                    </svg>
+                                </div>
+                                <h3 className="font-bold text-lg mb-2">Lightning Fast</h3>
+                                <p className="text-gray-600 text-sm">Complete challenges in minutes</p>
+                            </div>
+                            <div className="interactive-card bg-white p-6 rounded-xl shadow-md border border-indigo-100">
+                                <div className="text-yellow-500 text-3xl mb-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                                    </svg>
+                                </div>
+                                <h3 className="font-bold text-lg mb-2">Earn Rewards</h3>
+                                <p className="text-gray-600 text-sm">Unlock exclusive Bino Bot perks</p>
+                            </div>
+                            <div className="interactive-card bg-white p-6 rounded-xl shadow-md border border-indigo-100">
+                                <div className="text-green-500 text-3xl mb-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656-.126-1.283-.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    </svg>
+                                </div>
+                                <h3 className="font-bold text-lg mb-2">Join Community</h3>
+                                <p className="text-gray-600 text-sm">Connect with productivity enthusiasts</p>
+                            </div>
+                        </div>
+                        
+                        {/* Social Proof */}
+                        <div className="bg-white/80 backdrop-blur-sm p-4 rounded-full inline-flex items-center shadow-md border border-indigo-100">
+                            <div className="flex -space-x-2 mr-3">
+                                {[1, 2, 3, 4].map((i) => (
+                                    <div key={i} className="w-8 h-8 rounded-full bg-indigo-200 border-2 border-white flex items-center justify-center text-xs font-bold text-indigo-700">
+                                        {i}
+                                    </div>
+                                ))}
+                            </div>
+                            <span className="text-gray-700 font-medium">
+                                <span className="text-indigo-600 font-bold">{explorerCount}</span> explorers started today!
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Challenge Component
+        function ChallengeMeetingScheduler({ onComplete }) {
+            const [meetings, setMeetings] = useState([
+                { id: 1, name: 'Team Sync', timezone: 'EST', scheduled: false },
+                { id: 2, name: 'Client Call', timezone: 'PST', scheduled: false },
+                { id: 3, name: 'Project Review', timezone: 'GMT', scheduled: false },
+            ]);
+            
+            const [timeSlots] = useState([
+                '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM'
+            ]);
+            
+            const [selectedMeeting, setSelectedMeeting] = useState(null);
+            const [selectedSlot, setSelectedSlot] = useState(null);
+            const [showSuccess, setShowSuccess] = useState(false);
+            const [dragging, setDragging] = useState(false);
+            const [hint, setHint] = useState('');
+            const { playClickSound, playSuccessSound, playErrorSound } = useSound();
+            
+            const scheduleMeeting = () => {
+                if (selectedMeeting && selectedSlot) {
+                    setMeetings(prev => 
+                        prev.map(meeting => 
+                            meeting.id === selectedMeeting 
+                                ? { ...meeting, scheduled: true, timeSlot: selectedSlot } 
+                                : meeting
+                        )
+                    );
+                    setSelectedMeeting(null);
+                    setSelectedSlot(null);
+                    setHint('');
+                }
+            };
+            
+            const handleDragStart = (e, meetingId) => {
+                setDragging(true);
+                e.dataTransfer.setData('meetingId', meetingId);
+                e.target.classList.add('dragging');
+            };
+            
+            const handleDragEnd = (e) => {
+                setDragging(false);
+                e.target.classList.remove('dragging');
+            };
+            
+            const handleDragOver = (e) => {
+                e.preventDefault();
+                e.currentTarget.classList.add('drag-over');
+            };
+            
+            const handleDragLeave = (e) => {
+                e.currentTarget.classList.remove('drag-over');
+            };
+            
+            const handleDrop = (e, slot) => {
+                e.preventDefault();
+                e.currentTarget.classList.remove('drag-over');
+                const meetingId = parseInt(e.dataTransfer.getData('meetingId'));
+                setSelectedMeeting(meetingId);
+                setSelectedSlot(slot);
+                setHint(`Meeting scheduled for ${slot}!`);
+            };
+            
+            const handleMeetingClick = (meetingId) => {
+                if (!meetings.find(m => m.id === meetingId).scheduled) {
+                    setSelectedMeeting(meetingId);
+                    setHint('Now select a time slot');
+                }
+            };
+            
+            const handleSlotClick = (slot) => {
+                if (selectedMeeting) {
+                    setSelectedSlot(slot);
+                    setHint(`Click "Schedule Meeting" to confirm`);
+                } else {
+                    setHint('Select a meeting first');
+                    playErrorSound();
+                }
+            };
+            
+            useEffect(() => {
+                if (meetings.every(m => m.scheduled)) {
+                    setShowSuccess(true);
+                    setTimeout(() => {
+                        onComplete('meeting-scheduler', 10);
+                    }, 2000);
+                }
+            }, [meetings, onComplete]);
+            
+            return (
+                <div className="flex flex-col items-center justify-center min-h-screen p-4">
+                    <div className="w-full max-w-4xl bg-white rounded-2xl shadow-xl p-6 md:p-8">
+                        <div className="flex justify-between items-center mb-6">
+                            <div>
+                                <h2 className="text-3xl font-bold text-indigo-800 mb-2">Challenge: Meeting Scheduler</h2>
+                                <p className="text-gray-600">
+                                    Schedule all meetings without conflicts. Bino Bot helps with timezone detection!
+                                </p>
+                            </div>
+                            <div className="bg-indigo-100 text-indigo-800 px-4 py-2 rounded-full font-bold">
+                                +10 coins
+                            </div>
+                        </div>
+                        
+                        {hint && (
+                            <div className="mb-4 p-3 bg-blue-50 text-blue-800 rounded-lg text-center animate-pulse">
+                                {hint}
+                            </div>
+                        )}
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            {/* Meetings List */}
+                            <div>
+                                <h3 className="text-xl font-semibold mb-4 flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656-.126-1.283-.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    </svg>
+                                    Meetings
+                                </h3>
+                                <p className="text-sm text-gray-500 mb-4">Drag meetings to time slots or click to select</p>
+                                <div className="space-y-3">
+                                    {meetings.map(meeting => (
+                                        <div
+                                            key={meeting.id}
+                                            draggable={!meeting.scheduled}
+                                            onDragStart={(e) => handleDragStart(e, meeting.id)}
+                                            onDragEnd={handleDragEnd}
+                                            onClick={() => handleMeetingClick(meeting.id)}
+                                            className={`p-4 rounded-lg cursor-grab ${
+                                                meeting.scheduled 
+                                                    ? 'bg-green-100 border-2 border-green-500' 
+                                                    : selectedMeeting === meeting.id
+                                                        ? 'bg-indigo-100 border-2 border-indigo-500'
+                                                        : 'bg-gray-100 border-2 border-gray-300 hover:bg-indigo-50'
+                                            }`}
+                                        >
+                                            <div className="font-medium flex items-center">
+                                                {meeting.scheduled && (
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                )}
+                                                {meeting.name}
+                                            </div>
+                                            <div className="text-sm text-gray-500">{meeting.timezone}</div>
+                                            {meeting.scheduled && (
+                                                <div className="text-green-600 text-sm mt-1">
+                                                    Scheduled at {meeting.timeSlot}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            
+                            {/* Time Slots */}
+                            <div>
+                                <h3 className="text-xl font-semibold mb-4 flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Available Time Slots
+                                </h3>
+                                <p className="text-sm text-gray-500 mb-4">Drop meetings here or click to select</p>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {timeSlots.map(slot => (
+                                        <div
+                                            key={slot}
+                                            onDragOver={handleDragOver}
+                                            onDragLeave={handleDragLeave}
+                                            onDrop={(e) => handleDrop(e, slot)}
+                                            onClick={() => handleSlotClick(slot)}
+                                            className={`p-3 rounded-lg text-center min-h-[60px] flex items-center justify-center ${
+                                                selectedSlot === slot
+                                                    ? 'bg-indigo-500 text-white'
+                                                    : 'bg-gray-100 hover:bg-indigo-100 border-2 border-dashed border-gray-300'
+                                            } ${dragging ? 'border-indigo-400' : ''}`}
+                                        >
+                                            {slot}
+                                        </div>
+                                    ))}
+                                </div>
+                                
+                                {selectedMeeting && selectedSlot && (
+                                    <button
+                                        onClick={scheduleMeeting}
+                                        className="btn-primary mt-6 w-full"
+                                    >
+                                        Schedule Meeting
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                        
+                        {showSuccess && (
+                            <div className="mt-8 p-4 bg-green-100 text-green-800 rounded-lg text-center animate-pulse">
+                                <div className="text-xl font-bold flex items-center justify-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Challenge Completed!
+                                </div>
+                                <p className="mt-2">You've earned 10 Bino Coins!</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // Reward System Component
+        function RewardSystem({ coins, completedChallenges, onRestart, level, achievements }) {
+            const rewards = [
+                { id: 1, name: 'Explorer Badge', cost: 10, icon: '🏆', unlocked: coins >= 10 },
+                { id: 2, name: 'Bino Bot Wallpaper', cost: 20, icon: '🖼️', unlocked: coins >= 20 },
+                { id: 3, name: 'Premium Discount', cost: 50, icon: '💰', unlocked: coins >= 50 },
+                { id: 4, name: 'VIP Access', cost: 100, icon: '🌟', unlocked: coins >= 100 },
+            ];
+            
+            const challenges = [
+                { id: 'meeting-scheduler', name: 'Meeting Scheduler', icon: '📅' },
+                { id: 'task-organizer', name: 'Task Organizer', icon: '✅' },
+                { id: 'info-finder', name: 'Info Finder', icon: '🔍' },
+                { id: 'reminder-setter', name: 'Reminder Setter', icon: '⏰' },
+                { id: 'report-generator', name: 'Report Generator', icon: '📊' },
+            ];
+
+            const claimReward = (rewardId) => {
+                const reward = rewards.find(r => r.id === rewardId);
+                if (reward && reward.unlocked) {
+                    alert(`You've claimed: ${reward.name}!`);
+                }
+            };
+
+            const { playClickSound } = useSound();
+
+            return (
+                <div className="flex flex-col items-center justify-center min-h-screen p-4">
+                    <div className="w-full max-w-4xl bg-white rounded-2xl shadow-xl p-6 md:p-8">
+                        <div className="flex flex-col md:flex-row justify-between items-center mb-8">
+                            <div>
+                                <h2 className="text-3xl font-bold text-indigo-800 flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mr-3 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                                    </svg>
+                                    Your Rewards
+                                </h2>
+                                <div className="flex items-center mt-2">
+                                    <p className="text-gray-600 mr-4">You've earned <span className="coin">{coins}</span> Bino Coins!</p>
+                                    <div className="text-sm text-indigo-600">
+                                        Next level in {level * 30 - coins} coins
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button
+                                onClick={onRestart}
+                                className="btn-primary mt-4 md:mt-0 flex items-center"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                Restart Quest
+                            </button>
+                        </div>
+                        
+                        {/* Achievements */}
+                        {achievements.length > 0 && (
+                            <div className="mb-8">
+                                <h3 className="text-xl font-semibold mb-4 flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Achievements Unlocked
+                                </h3>
+                                <div className="flex flex-wrap gap-3">
+                                    {achievements.map(achievement => (
+                                        <div key={achievement.id} className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full flex items-center">
+                                            <span className="text-xl mr-2">{achievement.icon}</span>
+                                            <span className="font-medium">{achievement.name}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            {/* Rewards Section */}
+                            <div>
+                                <h3 className="text-xl font-semibold mb-4">Available Rewards</h3>
+                                <div className="space-y-4">
+                                    {rewards.map(reward => (
+                                        <div
+                                            key={reward.id}
+                                            className={`p-4 rounded-lg border-2 transition-all ${
+                                                reward.unlocked
+                                                    ? 'bg-green-50 border-green-500 hover:shadow-md'
+                                                    : 'bg-gray-100 border-gray-300'
+                                            }`}
+                                        >
+                                            <div className="flex items-center">
+                                                <span className="text-2xl mr-3">{reward.icon}</span>
+                                                <div className="flex-1">
+                                                    <div className="font-bold">{reward.name}</div>
+                                                    <div className="text-sm text-gray-600">{reward.cost} coins</div>
+                                                </div>
+                                                <button
+                                                    onClick={() => claimReward(reward.id)}
+                                                    className={`px-4 py-2 rounded-lg transition-all ${
+                                                        reward.unlocked
+                                                            ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                                                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                                    }`}
+                                                    disabled={!reward.unlocked}
+                                                >
+                                                    {reward.unlocked ? 'Claim' : 'Locked'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            
+                            {/* Challenges Progress */}
+                            <div>
+                                <h3 className="text-xl font-semibold mb-4">Quest Progress</h3>
+                                <div className="space-y-3">
+                                    {challenges.map(challenge => (
+                                        <div
+                                            key={challenge.id}
+                                            className={`p-3 rounded-lg flex items-center ${
+                                                completedChallenges.includes(challenge.id)
+                                                    ? 'bg-green-100 border-2 border-green-500'
+                                                    : 'bg-gray-100 border-2 border-gray-300'
+                                            }`}
+                                        >
+                                            <span className="text-xl mr-3">{challenge.icon}</span>
+                                            <div className="flex-1">
+                                                <div className="font-medium">{challenge.name}</div>
+                                            </div>
+                                            {completedChallenges.includes(challenge.id) ? (
+                                                <span className="text-green-600 font-bold flex items-center">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                    Completed
+                                                </span>
+                                            ) : (
+                                                <span className="text-gray-500">Locked</span>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                                
+                                <div className="mt-6 p-4 bg-indigo-50 rounded-lg">
+                                    <h4 className="font-bold text-indigo-800 mb-2">Ready for more?</h4>
+                                    <p className="text-gray-600 mb-3">
+                                        Complete all challenges to unlock the ultimate reward!
+                                    </p>
+                                    <a
+                                        href="https://bino.bot"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-indigo-600 font-bold hover:underline inline-flex items-center"
+                                    >
+                                        Try Bino Bot for free
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                        </svg>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="mt-8 pt-6 border-t border-gray-200">
+                            <h3 className="text-xl font-semibold mb-4 flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                                </svg>
+                                Share Your Achievement
+                            </h3>
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                                <p className="text-gray-600 text-center sm:text-left">
+                                    Share your progress and challenge friends!
+                                </p>
+                                
+                                <div className="flex space-x-3">
+                                    <a
+                                        href={`https://twitter.com/intent/tweet?text=I just completed ${completedChallenges.length} challenges in the Bino Bot Discovery Quest and earned ${coins} Bino Coins! Try it yourself:&url=https://bino.bot`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="bg-blue-400 text-white p-3 rounded-full hover:bg-blue-500 transition-colors"
+                                        aria-label="Share on Twitter"
+                                    >
+                                        <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M8.29 20.251c7.547 0 11.675-6.253 11.675-11.675 0-.178 0-.355-.012-.53A8.348 8.348 0 0022 5.92a8.19 8.19 0 01-2.357.646 4.118 4.118 0 001.804-2.27 8.224 8.224 0 01-2.605.996 4.107 4.107 0 00-6.993 3.743 11.65 11.65 0 01-8.457-4.287 4.106 4.106 0 001.27 5.477A4.072 4.072 0 012.8 9.713v.052a4.105 4.105 0 003.292 4.022 4.095 4.095 0 01-1.853.07 4.108 4.108 0 003.834 2.85A8.233 8.233 0 012 18.407a11.616 11.616 0 006.29 1.84" />
+                                        </svg>
+                                    </a>
+                                    
+                                    <a
+                                        href={`https://www.linkedin.com/sharing/share-offsite/?url=https://bino.bot`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="bg-blue-700 text-white p-3 rounded-full hover:bg-blue-800 transition-colors"
+                                        aria-label="Share on LinkedIn"
+                                    >
+                                        <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
+                                        </svg>
+                                    </a>
+                                    
+                                    <button
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(`I just completed ${completedChallenges.length} challenges in the Bino Bot Discovery Quest and earned ${coins} Bino Coins! Try it yourself: https://bino.bot`);
+                                            alert('Link copied to clipboard!');
+                                        }}
+                                        className="bg-gray-600 text-white p-3 rounded-full hover:bg-gray-700 transition-colors"
+                                        aria-label="Copy link"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Render the app
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
